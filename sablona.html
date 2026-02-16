@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="sk">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motherboard Component Audit</title>
+    <meta name="description" content="Hardware annotation tool for Motherboards - Board, Zone, and Component analysis">
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Main Application Container -->
+    <div id="app">
+        <!-- Header Toolbar -->
+        <header class="toolbar">
+            <div class="toolbar-left">
+                <h1 class="logo">Identifikácia Hardware</h1>
+            </div>
+            <div class="toolbar-center">
+                <button id="btnAnnotate" class="btn btn-primary">
+                    Vyznačiť Oblasť
+                </button>
+                <button id="btnCellAnnotate" class="btn btn-secondary">
+                    Vyznačiť Súčiastku
+                </button>
+                <button id="btnShowAll" class="btn btn-accent">
+                    Zobraziť Prehľad
+                </button>
+            </div>
+            <div class="toolbar-right">
+                <!-- Status indicator removed or kept minimal -->
+                <div class="status-indicator">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Pripravené</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- WSI Viewer Container -->
+        <div id="wsiContainer" class="wsi-container">
+            <canvas id="wsiCanvas"></canvas>
+            <div id="annotationLayer" class="annotation-layer"></div>
+
+            <!-- Zoom Controls -->
+            <div class="zoom-controls">
+                <button id="btnZoomIn" class="zoom-btn">+</button>
+                <span id="zoomLevel">100%</span>
+                <button id="btnZoomOut" class="zoom-btn">-</button>
+                <button id="btnReset" class="zoom-btn">↺</button>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- REGION LEVEL MODAL (OBLASŤ) -->
+        <!-- ============================================ -->
+        <div id="regionLevelModal" class="modal">
+            <div class="modal-content region-level">
+                <div class="modal-header">
+                    <span class="level-badge region">OBLASŤ (REGION)</span>
+                    <button class="modal-close" data-close="regionLevelModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <!-- Zone Selection -->
+                    <div class="form-group">
+                        <label for="regionZoneSelect">Názov oblasti:</label>
+                        <select id="regionZoneSelect" class="form-input form-select">
+                            <!-- Dynamically populated from JS -->
+                            <option value="">-- Vyberte oblasť --</option>
+                        </select>
+                    </div>
+
+                    <!-- Comment -->
+                    <div class="form-group">
+                        <label for="regionComment">Poznámka:</label>
+                        <textarea id="regionComment" class="form-textarea" rows="3"
+                            placeholder="Stručný popis..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="btnRegionSave" class="btn btn-success">
+                        Uložiť Oblasť
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- CELL LEVEL MODAL (SÚČIASTKA) -->
+        <!-- ============================================ -->
+        <div id="cellLevelModal" class="modal">
+            <div class="modal-content cell-level">
+                <div class="modal-header">
+                    <span class="level-badge cell">SÚČIASTKA (COMPONENT)</span>
+                    <button class="modal-close" data-close="cellLevelModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <!-- Component Type -->
+                    <div class="form-group">
+                        <label for="cellTypeSelect">Názov súčiastky:</label>
+                        <select id="cellTypeSelect" class="form-input form-select">
+                            <!-- Dynamically populated based on Region -->
+                            <option value="">-- Vyberte súčiastku --</option>
+                        </select>
+                    </div>
+
+                    <!-- Comment -->
+                    <div class="form-group">
+                        <label for="cellComment">Popis stavu:</label>
+                        <textarea id="cellComment" class="form-textarea" rows="3"
+                            placeholder="Vizuálny stav, poškodenie..."></textarea>
+                    </div>
+                </div>
+                <!-- Dual footer removed for simplicity, just Save -->
+                <div class="modal-footer">
+                    <button id="btnCellSave" class="btn btn-success">
+                        Uložiť Súčiastku
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- FULL ANNOTATION SUMMARY MODAL -->
+        <!-- ============================================ -->
+        <div id="summaryModal" class="modal">
+            <div class="modal-content summary-modal">
+                <div class="modal-header">
+                    <span class="level-badge summary">PREHĽAD ANOTÁCIÍ</span>
+                    <button class="modal-close" data-close="summaryModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="summaryContent" class="summary-content">
+                        <!-- Dynamically filled list -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="btnExport" class="btn btn-secondary">
+                        Stiahnuť JSON
+                    </button>
+                    <button id="btnSummaryClose" class="btn btn-secondary">
+                        Zavrieť
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Annotation instruction overlay -->
+        <div id="annotationOverlay" class="annotation-overlay hidden">
+            <div class="annotation-instruction">
+                Kreslenie: <span id="annotationModeLabel" style="font-weight: 600; color: #fff;"></span>
+                <br><small>Kliknite a ťahajte myšou</small>
+            </div>
+            <button id="btnCancelAnnotation" class="btn btn-sm btn-danger"
+                style="margin-top: 10px; pointer-events: auto;">
+                Zrušiť
+            </button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
