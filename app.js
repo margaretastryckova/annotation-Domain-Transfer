@@ -61,7 +61,9 @@ const AppState = {
     currentCellIndex: -1,
 
     // UI References
-    isEditing: false
+    isEditing: false,
+    currentBoxElement: null,
+    currentRect: null
 };
 
 // 3. DOM ELEMENTS
@@ -207,6 +209,7 @@ function startAnnotation(mode) {
     // Set cursor
     DOM.wsiContainer.classList.add('annotating');
     AppState.isAnnotating = true;
+    AppState.isEditing = false;
     AppState.currentMode = mode;
 
     // Show overlay
@@ -319,14 +322,18 @@ function finishAnnotation() {
     const logicalW = screenWidth / AppState.scale;
     const logicalH = screenHeight / AppState.scale;
 
+    AppState.isEditing = false;
+    AppState.currentBoxElement = box;
+    AppState.currentRect = { x: logicalX, y: logicalY, w: logicalW, h: logicalH };
+
     // Store data based on mode
     if (AppState.currentMode === 'region') {
-        openRegionModal(box, { x: logicalX, y: logicalY, w: logicalW, h: logicalH });
+        openRegionModal();
     } else {
         // Auto-assign to latest region for simplicity in demo
         if (AppState.regions.length > 0) {
             AppState.currentRegionIndex = AppState.regions.length - 1; // Default to last
-            openCellModal(box, { x: logicalX, y: logicalY, w: logicalW, h: logicalH });
+            openCellModal();
         } else {
             alert('Najskôr vytvorte oblasť!');
             box.remove();
@@ -344,15 +351,27 @@ function finishAnnotation() {
 // ============================================
 
 // --- REGION ---
-function openRegionModal(boxElement, rectData) {
-    AppState.currentBoxElement = boxElement;
-    AppState.currentRect = rectData;
-
-    // Reset form
-    document.getElementById('regionZoneSelect').value = '';
-    document.getElementById('regionComment').value = '';
+// --- REGION ---
+function openRegionModal() {
+    // If not editing, it's a new one (set in finishAnnotation)
+    if (AppState.isEditing) {
+        const region = AppState.regions[AppState.currentRegionIndex];
+        document.getElementById('regionZoneSelect').value = region.zoneName;
+        document.getElementById('regionComment').value = region.note || '';
+        document.getElementById('btnRegionSave').textContent = 'Aktualizovať Oblasť';
+    } else {
+        document.getElementById('regionZoneSelect').value = '';
+        document.getElementById('regionComment').value = '';
+        document.getElementById('btnRegionSave').textContent = 'Uložiť Oblasť';
+    }
 
     openModal('regionLevelModal');
+}
+
+function editRegion(index) {
+    AppState.isEditing = true;
+    AppState.currentRegionIndex = index;
+    openRegionModal();
 }
 
 function saveRegionLevel() {
@@ -364,41 +383,60 @@ function saveRegionLevel() {
         return;
     }
 
-    // Create new Region
-    const newRegion = {
-        id: Date.now(),
-        zoneName: zoneName,
-        note: comment,
-        rect: AppState.currentRect, // {x,y,w,h}
-        boxElement: AppState.currentBoxElement,
-        cells: []
-    };
+    if (AppState.isEditing) {
+        // Update existing Region
+        const region = AppState.regions[AppState.currentRegionIndex];
+        region.zoneName = zoneName;
+        region.note = comment;
+        addLabelToBox(region.boxElement, zoneName, 'region', AppState.currentRegionIndex);
+    } else {
+        // Create new Region
+        const newRegion = {
+            id: Date.now(),
+            zoneName: zoneName,
+            note: comment,
+            rect: AppState.currentRect, // {x,y,w,h}
+            boxElement: AppState.currentBoxElement,
+            cells: []
+        };
 
-    AppState.regions.push(newRegion);
-    AppState.currentRegionIndex = AppState.regions.length - 1;
+        AppState.regions.push(newRegion);
+        AppState.currentRegionIndex = AppState.regions.length - 1;
 
-    // Add Label to Box
-    addLabelToBox(newRegion.boxElement, zoneName, 'region');
+        // Add Label to Box
+        addLabelToBox(newRegion.boxElement, zoneName, 'region', AppState.currentRegionIndex);
+    }
 
     closeModal('regionLevelModal');
-    // alert('Oblasť uložená!');
+    AppState.isEditing = false;
 }
 
 // --- CELL (COMPONENT) ---
-function openCellModal(boxElement, rectData) {
-    AppState.currentBoxElement = boxElement;
-    AppState.currentRect = rectData;
-
-    // Populate dropdown based on current region
+// --- CELL (COMPONENT) ---
+function openCellModal() {
     const currentRegion = AppState.regions[AppState.currentRegionIndex];
     if (currentRegion) {
         populateCellDropdown(currentRegion.zoneName);
     }
 
-    // Reset form
-    document.getElementById('cellComment').value = '';
+    if (AppState.isEditing) {
+        const cell = currentRegion.cells[AppState.currentCellIndex];
+        document.getElementById('cellTypeSelect').value = cell.componentName;
+        document.getElementById('cellComment').value = cell.note || '';
+        document.getElementById('btnCellSave').textContent = 'Aktualizovať Súčiastku';
+    } else {
+        document.getElementById('cellComment').value = '';
+        document.getElementById('btnCellSave').textContent = 'Uložiť Súčiastku';
+    }
 
     openModal('cellLevelModal');
+}
+
+function editCell(regionIndex, cellIndex) {
+    AppState.isEditing = true;
+    AppState.currentRegionIndex = regionIndex;
+    AppState.currentCellIndex = cellIndex;
+    openCellModal();
 }
 
 function populateCellDropdown(regionName) {
@@ -423,38 +461,67 @@ function saveCellLevel() {
         return;
     }
 
-    const newCell = {
-        id: Date.now(),
-        componentName: compName,
-        note: comment,
-        rect: AppState.currentRect,
-        boxElement: AppState.currentBoxElement
-    };
+    if (AppState.isEditing) {
+        const cell = AppState.regions[AppState.currentRegionIndex].cells[AppState.currentCellIndex];
+        cell.componentName = compName;
+        cell.note = comment;
+        addLabelToBox(cell.boxElement, compName, 'cell', AppState.currentRegionIndex, AppState.currentCellIndex);
+    } else {
+        const newCell = {
+            id: Date.now(),
+            componentName: compName,
+            note: comment,
+            rect: AppState.currentRect,
+            boxElement: AppState.currentBoxElement
+        };
 
-    // Add to current region
-    AppState.regions[AppState.currentRegionIndex].cells.push(newCell);
+        // Add to current region
+        const region = AppState.regions[AppState.currentRegionIndex];
+        region.cells.push(newCell);
+        const cellIndex = region.cells.length - 1;
 
-    // Add Label
-    addLabelToBox(newCell.boxElement, compName, 'cell');
+        // Add Label
+        addLabelToBox(newCell.boxElement, compName, 'cell', AppState.currentRegionIndex, cellIndex);
+    }
 
     closeModal('cellLevelModal');
+    AppState.isEditing = false;
 }
 
 // --- HELPERS ---
-function addLabelToBox(box, text, type) {
-    const label = document.createElement('div');
-    label.className = 'box-label';
-    label.textContent = text;
-    if (type === 'cell') {
-        label.style.backgroundColor = 'var(--cell-color)';
+// --- HELPERS ---
+function addLabelToBox(box, text, type, rIndex, cIndex = -1) {
+    let label = box.querySelector('.box-label');
+    if (!label) {
+        label = document.createElement('div');
+        label.className = 'box-label';
+        if (type === 'cell') {
+            label.style.backgroundColor = 'var(--cell-color)';
+        }
+        box.appendChild(label);
     }
-    box.appendChild(label);
+    label.textContent = text;
 
-    // Make clickable to show info (simple alert for demo)
-    box.addEventListener('click', (e) => {
+    // Store indexes for editing
+    box.dataset.type = type;
+    box.dataset.rIndex = rIndex;
+    box.dataset.cIndex = cIndex;
+
+    // Update click listener
+    box.onclick = (e) => {
         e.stopPropagation();
-        alert(`${type === 'region' ? 'OBLASŤ' : 'SÚČIASTKA'}: ${text}`);
-    });
+        if (AppState.isAnnotating) return;
+
+        const t = box.dataset.type;
+        const r = parseInt(box.dataset.rIndex);
+        const c = parseInt(box.dataset.cIndex);
+
+        if (t === 'region') {
+            editRegion(r);
+        } else {
+            editCell(r, c);
+        }
+    };
 }
 
 function updateAnnotationPositions() {
